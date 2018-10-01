@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 
-# recupere les PJ dans les mails destiné à la boite AR et les enregistre dans un répertoire bien précis
+# Get and save all the attachements in a POP3 mailbox
 
 $| = 1;
 use strict;
@@ -13,9 +13,9 @@ use POSIX qw(strftime);
 use DateTime::Format::Natural;
 
 # options management
-my ($directory, $pop3, $user, $port, $ssl, $password, $filter, $nodelete, $nosave, $quiet, $debug, $help);
+my (@directories, $pop3, $user, $port, $ssl, $password, $filter, $nodelete, $nosave, $quiet, $debug, $help);
 GetOptions(
-	'directory=s'=>\$directory,
+	'directory=s'=>\@directories,
 	'pop3|host=s'=>\$pop3,
 	'port=i'=>\$port,
 	'ssl!'=>\$ssl,
@@ -38,6 +38,7 @@ Parameters :
 --password=pass	Password for the POP3 account (require)
 
 --directory=dir	Directory where to save the attachements (require)
+				You can specify multi directories using this options many times.
 	Example :
 	--directory=my_attachements
 	--directory=attachements/{fromName}
@@ -64,13 +65,12 @@ Parameters :
 EOT
 
 # required options
-die("Option --directory is required") 	unless length($directory)>0;
+die("Option --directory is required") 	unless scalar(@directories)>0;
 die("Option --pop3 is required") 		unless length($pop3)>0;
 die("Option --user is required") 		unless length($user)>0;
 die("Option --password is required") 	unless length($password)>0;
 
 $port = 110 unless length($port)>0;
-$directory = $directory.'/' ; # add trailing slash to the direcory
 
 printf("%s START\n", get_time()) unless $quiet;
 
@@ -112,23 +112,25 @@ if ($pop->login($user, $password) > 0) {
 				my $filename = $attachment->{'filename'};
 
 				unless ($nosave) {
-					my $final_directory = $directory;
-					$final_directory =~ s/{subject}/$subject/gi;
-					$final_directory =~ s/{fromName}/$fromName/gi;
-					$final_directory =~ s/{fromEmail}/$fromEmail/gi;
-					$final_directory =~ s/{filename}/$filename/gi;
+					foreach my $directory (@directories) {
+						my $final_directory = $directory;
+						# transpose dynamics directory name
+						$final_directory =~ s/{subject}/$subject/gi;
+						$final_directory =~ s/{fromName}/$fromName/gi;
+						$final_directory =~ s/{fromEmail}/$fromEmail/gi;
+						$final_directory =~ s/{filename}/$filename/gi;
+						if ($dt) {
+							$final_directory =~ s/{date=(.*?)}/$dt->strftime($1)/gie;
+						}					
 
-					if ($dt) {
-						$final_directory =~ s/{date=(.*?)}/$dt->strftime($1)/gie;
-					}					
-
-					my $final_filename 	= $final_directory.$attachment->{'filename'};
-					mkpath($final_directory);
-					open(F,"+>$final_filename") or warn "Unable to create file '$final_filename' ($!)";
-					binmode(F);
-					print F $attachment->{'payload'};
-					close F;
-					printf("%s File save to %s\n", get_time(), $final_filename) unless $quiet;
+						my $final_filename 	= $final_directory.'/'.$attachment->{'filename'};
+						mkpath($final_directory);
+						open(F,"+>$final_filename") or warn "Unable to create file '$final_filename' ($!)";
+						binmode(F);
+						print F $attachment->{'payload'};
+						close F;
+						printf("%s File save to %s\n", get_time(), $final_filename) unless $quiet;
+					} # end forerach directory
 				}
 
 				$keep_attach++;
