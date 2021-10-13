@@ -18,6 +18,7 @@ External used librairies :
 --password=pass	Password for the POP3 account (require)
 
 --directory=dir	Directory where to save the attachements (require)
+				You can specify multi directories using this options many times.
 	Example :
 	--directory=my_attachements
 	--directory=attachements/{fromName}
